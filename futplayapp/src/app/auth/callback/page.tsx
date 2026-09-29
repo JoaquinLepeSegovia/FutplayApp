@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { getGoogleRedirectUri } from "@/lib/google-oauth";
 import { Loader2 } from "lucide-react";
 
 export default function AuthCallback() {
@@ -38,7 +39,7 @@ export default function AuthCallback() {
       }
 
       try {
-        const redirectUri = `${window.location.origin}/auth/callback`;
+        const redirectUri = getGoogleRedirectUri();
 
         const res = await fetch("/api/auth/google/exchange", {
           method: "POST",

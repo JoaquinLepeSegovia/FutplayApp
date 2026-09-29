@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/client";
 import { User } from "@supabase/supabase-js";
+import { getGoogleRedirectUri } from "@/lib/google-oauth";
 
 export type Rol = "jugador" | "profesor" | "administrador";
 
@@ -49,11 +50,14 @@ export async function signOut(): Promise<void> {
 export async function signInWithGoogle(): Promise<{ error: string | null }> {
     try {
         const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!;
-        const redirectUri = `${window.location.origin}/auth/callback`;
+        const redirectUri = getGoogleRedirectUri();
 
         const state = crypto.randomUUID();
         localStorage.setItem("oauth_state", state);
 
+        // Verificación de dominio: Google sólo acepta el redirect_uri exacto
+        // registrado en el OAuth Client. Sin este chequeo, entrar por un host
+        // alterno (preview de Vercel, www, IP) provoca 400 redirect_uri_mismatch.
         const params = new URLSearchParams({
             client_id: clientId,
             redirect_uri: redirectUri,

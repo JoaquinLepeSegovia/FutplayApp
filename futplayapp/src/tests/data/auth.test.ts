@@ -30,6 +30,7 @@ beforeEach(() => {
 vi.stubGlobal("window", {
     location: {
         origin: "http://localhost:3000",
+        hostname: "localhost",
         href: "",
     },
 });

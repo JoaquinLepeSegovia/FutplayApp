@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
+import { getGoogleRedirectUri, isAllowedGoogleRedirectUri } from "@/lib/google-oauth";
 
 export async function POST(request: Request) {
   const { code, redirectUri } = await request.json();
 
   if (!code) {
     return NextResponse.json({ error: "No code provided" }, { status: 400 });
+  }
+
+  // No confiamos en el redirect_uri del cliente: debe coincidir exactamente
+  // con el canónico, o Google responde 400 redirect_uri_mismatch.
+  if (!isAllowedGoogleRedirectUri(redirectUri, request)) {
+    return NextResponse.json({ error: "Invalid redirect_uri" }, { status: 400 });
   }
 
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!;
