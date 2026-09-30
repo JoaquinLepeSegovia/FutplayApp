@@ -71,6 +71,16 @@ function EstadoBadge({ m }: { m: MembresiaGestion }) {
       </span>
     );
   }
+  if (m.sin_tokens) {
+    return (
+      <span
+        className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700"
+        title="Se cerró al agotarse los tokens. El alumno puede comprar el plan siguiente. Si devolvió un token por cancelación, reactivala para devolvérselo."
+      >
+        Sin tokens
+      </span>
+    );
+  }
   return (
     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${m.estado ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
       {m.estado ? "Activa" : "Inactiva"}

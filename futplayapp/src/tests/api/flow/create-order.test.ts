@@ -117,13 +117,57 @@ describe("POST /api/flow/create-order", () => {
             const ahora = new Date();
             const fecha_inicio = ahora.toISOString();
             const fecha_vencimiento = new Date(ahora.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
-            __setTableData("membresia", { id: "m1", usuario_id: "user-1", fecha_inicio, fecha_vencimiento });
+            __setTableData("membresia", { id: "m1", usuario_id: "user-1", fecha_inicio, fecha_vencimiento, estado: true, congelada: false, sin_tokens: false });
 
             const res = await POST(makeRequest({ planId: "plan-1" }));
 
             expect(res.status).toBe(409);
             const json = await res.json();
             expect(json.error).toContain("plan activo");
+        });
+
+        it("API-FLOW-CREATE-023: permite comprar si la membresía se cerró por falta de tokens", async () => {
+            // El trigger setea sin_tokens=true al agotar el saldo, aunque queden
+            // días de vigencia. El objetivo de la regla es justamente dejar
+            // comprar el plan siguiente.
+            __setAuthUser(TEST_USER);
+            __setTableData("usuario", TEST_USER);
+            __setTableData("plan", TEST_PLAN);
+            const ahora = new Date();
+            __setTableData("membresia", {
+                id: "m1",
+                usuario_id: "user-1",
+                fecha_inicio: ahora.toISOString(),
+                fecha_vencimiento: new Date(ahora.getTime() + 20 * 24 * 60 * 60 * 1000).toISOString(),
+                estado: false,
+                congelada: false,
+                sin_tokens: true,
+            });
+            __setTableData("boleta", { id: "boleta-1", usuario_id: "user-1", estado: "pendiente", total: 15000, recurrencia_id: null });
+            __setTableData("boleta_item", { id: "item-1" });
+
+            const res = await POST(makeRequest({ planId: "plan-1" }));
+
+            expect(res.status).toBe(200);
+        });
+
+        it("API-FLOW-CREATE-024: bloquea si existe una membresía usable aunque la última sea sin tokens", async () => {
+            // El filtro va en la base a propósito: un admin puede crear
+            // membresías desde el panel sin cerrar la anterior, así que la más
+            // reciente no es necesariamente la vigente.
+            __setAuthUser(TEST_USER);
+            __setTableData("usuario", TEST_USER);
+            __setTableData("plan", TEST_PLAN);
+            const ahora = new Date();
+            const futuro = new Date(ahora.getTime() + 20 * 24 * 60 * 60 * 1000).toISOString();
+            __setTableData("membresia", [
+                { id: "m1", usuario_id: "user-1", fecha_inicio: ahora.toISOString(), fecha_vencimiento: futuro, estado: false, congelada: false, sin_tokens: true },
+                { id: "m2", usuario_id: "user-1", fecha_inicio: ahora.toISOString(), fecha_vencimiento: futuro, estado: true, congelada: false, sin_tokens: false },
+            ]);
+
+            const res = await POST(makeRequest({ planId: "plan-1" }));
+
+            expect(res.status).toBe(409);
         });
 
         it("API-FLOW-CREATE-022: retorna 409 aunque la membresía activa sea de distinto plan", async () => {
@@ -136,7 +180,7 @@ describe("POST /api/flow/create-order", () => {
             const ahora = new Date();
             const fecha_inicio = ahora.toISOString();
             const fecha_vencimiento = new Date(ahora.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
-            __setTableData("membresia", { id: "m1", usuario_id: "user-1", plan_id: "plan-1", fecha_inicio, fecha_vencimiento });
+            __setTableData("membresia", { id: "m1", usuario_id: "user-1", plan_id: "plan-1", fecha_inicio, fecha_vencimiento, estado: true, congelada: false, sin_tokens: false });
 
             const res = await POST(makeRequest({ planId: "plan-2" }));
 
@@ -150,7 +194,7 @@ describe("POST /api/flow/create-order", () => {
             __setTableData("usuario", TEST_USER);
             __setTableData("plan", TEST_PLAN);
             // Membresía del mes pasado → vencida
-            __setTableData("membresia", { id: "m1", fecha_inicio: "2020-01-01T00:00:00.000Z", fecha_vencimiento: "2020-01-31T00:00:00.000Z" });
+            __setTableData("membresia", { id: "m1", fecha_inicio: "2020-01-01T00:00:00.000Z", fecha_vencimiento: "2020-01-31T00:00:00.000Z", estado: true, congelada: false, sin_tokens: false });
             __setTableData("boleta", { id: "boleta-1", usuario_id: "user-1", estado: "pendiente", total: 15000, recurrencia_id: null });
             __setTableData("boleta_item", { id: "item-1" });
 

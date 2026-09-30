@@ -137,6 +137,7 @@ export function makeChain(table: string) {
     let limitCount: number | undefined;
     let countExact = false;
     let headOnly = false;
+    let noMatchError: { message: string; code: string } | null = null;
 
     function execute(opts?: { single?: boolean; maybeSingle?: boolean }): Promise<any> {
         const r = state.tables[table];
@@ -144,6 +145,7 @@ export function makeChain(table: string) {
 
         let data = r.data;
         let error = r.error;
+        noMatchError = null;
 
         if (Array.isArray(data)) {
             if (filters.length > 0) {
@@ -160,7 +162,9 @@ export function makeChain(table: string) {
             const filtered = applyFilters(asArray, filters);
             data = filtered.length > 0 ? filtered[0] : null;
             if (!data) {
-                error = { message: "No rows match filter", code: "PGRST116" };
+                // PostgREST sólo reporta PGRST116 en .single(); .maybeSingle()
+                // devuelve { data: null, error: null } cuando no hay coincidencia.
+                noMatchError = { message: "No rows match filter", code: "PGRST116" };
             }
         }
 
@@ -179,14 +183,16 @@ export function makeChain(table: string) {
                 }
                 return Promise.resolve({ data: data[0], error, count });
             }
-            return Promise.resolve({ data, error, count });
+            return Promise.resolve({ data, error: error ?? noMatchError, count });
         }
 
         if (opts?.maybeSingle) {
+            // maybeSingle nunca falla por no encontrar filas: { data: null, error: null }.
+            const maybeError = data == null ? null : error;
             if (Array.isArray(data)) {
-                return Promise.resolve({ data: data[0] ?? null, error });
+                return Promise.resolve({ data: data[0] ?? null, error: maybeError });
             }
-            return Promise.resolve({ data: data ?? null, error });
+            return Promise.resolve({ data: data ?? null, error: maybeError });
         }
 
         return Promise.resolve({ data, error, count });

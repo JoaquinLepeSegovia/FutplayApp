@@ -17,6 +17,7 @@ type MembresiaGestionRow = {
   fecha_vencimiento: string;
   estado: boolean;
   congelada: boolean;
+  sin_tokens: boolean;
   fecha_congelamiento: string | null;
   created_at: string | null;
 };
@@ -65,6 +66,7 @@ export async function GET() {
       fecha_vencimiento: m.fecha_vencimiento,
       estado: m.estado,
       congelada: m.congelada === true,
+      sin_tokens: m.sin_tokens === true,
       fecha_congelamiento: m.fecha_congelamiento ?? null,
       created_at: m.created_at,
     }));
@@ -130,6 +132,13 @@ export async function PUT(request: Request) {
     if (body.fecha_inicio !== undefined) updateData.fecha_inicio = body.fecha_inicio;
     if (body.fecha_vencimiento !== undefined) updateData.fecha_vencimiento = body.fecha_vencimiento;
     if (body.estado !== undefined) updateData.estado = body.estado;
+
+    // Al reactivar a mano una membresía cerrada por falta de tokens hay que
+    // limpiar elFlag: si queda sin_tokens=true, la búsqueda de partidos y el
+    // badge del panel la seguirían tratando como agotada. El trigger vuelve a
+    // a cerrarla sola cuando el alumno gaste el token recuperado.
+    if (body.sin_tokens !== undefined) updateData.sin_tokens = body.sin_tokens;
+    else if (body.estado === true) updateData.sin_tokens = false;
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No hay campos para actualizar" }, { status: 400 });

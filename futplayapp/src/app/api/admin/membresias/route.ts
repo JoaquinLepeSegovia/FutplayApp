@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { traducirError } from "@/lib/errores";
+import { ahoraChile } from "@/lib/fechas";
 
 export async function GET() {
   const cookieStore = await cookies();
@@ -82,12 +83,26 @@ export async function GET() {
     tokens_restantes: number;
     fecha_inicio: string;
     fecha_vencimiento: string;
+    estado: boolean;
+    congelada: boolean;
+    sin_tokens: boolean;
   };
   const resultMap = new Map<string, MembresiaRow>();
 
+  // Se elige la fila con más tokens RESTANTES, no la mayor resta cruda: una
+  // membresía vencida, congelada o sin tokens no compite. Antes ganaba la fila
+  // con más saldo sin importar si estaba vigente, y el panel mostraba como
+  // "Activo" a un alumno cuyo único plan ya había vencido.
   for (const m of membresias || []) {
+    const sinTokens = m.sin_tokens === true;
+    const vigente =
+      m.estado === true &&
+      !sinTokens &&
+      !m.congelada &&
+      new Date(m.fecha_vencimiento) >= ahoraChile();
+    const restantes = vigente ? m.tokens_totales - m.tokens_usados : 0;
+
     const existing = resultMap.get(m.usuario_id);
-    const restantes = m.tokens_totales - m.tokens_usados;
 
     if (!existing || restantes > existing.tokens_restantes) {
       const plan = planesMap.get(m.plan_id);
@@ -104,6 +119,9 @@ export async function GET() {
         tokens_restantes: restantes,
         fecha_inicio: m.fecha_inicio,
         fecha_vencimiento: m.fecha_vencimiento,
+        estado: m.estado === true,
+        congelada: m.congelada === true,
+        sin_tokens: sinTokens,
       });
     }
   }

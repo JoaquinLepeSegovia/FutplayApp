@@ -21,6 +21,7 @@ type MembresiaRow = {
     fecha_vencimiento: string;
     estado: boolean;
     congelada: boolean;
+    sin_tokens?: boolean;
     fecha_congelamiento?: string | null;
 };
 
@@ -38,7 +39,9 @@ export type MembresiaConPlan = {
     tokens_restantes: number;
     fecha_inicio: string;
     fecha_vencimiento: string;
+    estado: boolean;
     congelada: boolean;
+    sin_tokens: boolean;
     fecha_congelamiento?: string | null;
 };
 
@@ -47,12 +50,15 @@ export async function userHasMembresia(userId: string): Promise<boolean> {
 
     const ahoraIso = ahoraChile().toISOString();
 
+    // sin_tokens=true cuenta como "sin plan": el trigger ya cerró la membresía al
+    // agotar el saldo y el alumno debe poder comprar el plan siguiente.
     const { data, error } = await supabase
         .from("membresia")
         .select("id")
         .eq("usuario_id", userId)
         .eq("estado", true)
         .eq("congelada", false)
+        .eq("sin_tokens", false)
         .lte("fecha_inicio", ahoraIso)
         .gte("fecha_vencimiento", ahoraIso)
         .order("fecha_vencimiento", { ascending: false })
@@ -85,7 +91,12 @@ async function getPlanById(planId: string): Promise<PlanRow | null> {
 }
 
 function buildMembresiaConPlan(m: MembresiaRow, plan: PlanRow | null): MembresiaConPlan {
-    const activa = m.estado === true && !m.congelada && membresiaActiva(m.fecha_vencimiento);
+    const sinTokens = m.sin_tokens === true;
+    const activa =
+        m.estado === true &&
+        !sinTokens &&
+        !m.congelada &&
+        membresiaActiva(m.fecha_vencimiento);
     const tokensUsados = activa ? m.tokens_usados : m.tokens_totales;
     const restantes = activa ? m.tokens_totales - m.tokens_usados : 0;
     return {
@@ -102,7 +113,9 @@ function buildMembresiaConPlan(m: MembresiaRow, plan: PlanRow | null): Membresia
         tokens_restantes: restantes,
         fecha_inicio: m.fecha_inicio,
         fecha_vencimiento: m.fecha_vencimiento,
+        estado: m.estado,
         congelada: m.congelada === true,
+        sin_tokens: sinTokens,
         fecha_congelamiento: m.fecha_congelamiento ?? null,
     };
 }
@@ -259,6 +272,7 @@ export type MembresiaGestion = {
   fecha_vencimiento: string;
   estado: boolean;
   congelada: boolean;
+  sin_tokens: boolean;
   fecha_congelamiento?: string | null;
 };
 

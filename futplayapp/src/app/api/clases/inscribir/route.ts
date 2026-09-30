@@ -76,7 +76,7 @@ export async function POST(request: Request) {
         .from("membresia")
         .select("plan!inner(tipo_plan)")
         .eq("usuario_id", user.id)
-        .eq("estado", true)
+        .or(`estado.eq.true,sin_tokens.eq.true`)
         .lte("fecha_inicio", ahoraIso)
         .gte("fecha_vencimiento", ahoraIso)
         .order("fecha_vencimiento", { ascending: false })

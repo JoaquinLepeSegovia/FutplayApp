@@ -9,6 +9,7 @@ type MembresiaRow = {
   id: string;
   estado: boolean;
   congelada: boolean;
+  sin_tokens: boolean;
   fecha_inicio: string;
   fecha_vencimiento: string;
   fecha_congelamiento: string | null;
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
 
     const { data: membresia, error } = await admin
       .from("membresia")
-      .select("id, estado, congelada, fecha_inicio, fecha_vencimiento, fecha_congelamiento")
+      .select("id, estado, congelada, sin_tokens, fecha_inicio, fecha_vencimiento, fecha_congelamiento")
       .eq("id", membreciaId)
       .maybeSingle();
 
@@ -52,6 +53,12 @@ export async function POST(request: Request) {
       const m = membresia as MembresiaRow;
       if (m.congelada) {
         return NextResponse.json({ error: "La membresía ya está congelada" }, { status: 400 });
+      }
+      if (m.sin_tokens) {
+        return NextResponse.json(
+          { error: "No se puede congelar una membresía sin tokens: no tiene saldo que pausar" },
+          { status: 400 }
+        );
       }
       if (!m.estado) {
         return NextResponse.json({ error: "Solo se puede congelar una membresía activa" }, { status: 400 });

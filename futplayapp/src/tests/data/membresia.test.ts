@@ -28,6 +28,7 @@ describe("userHasMembresia", () => {
             usuario_id: USER_ID,
             estado: true,
             congelada: false,
+            sin_tokens: false,
             fecha_inicio: "2026-06-01T00:00:00.000Z",
             fecha_vencimiento: "2026-07-01T00:00:00.000Z",
         }]);
@@ -35,6 +36,24 @@ describe("userHasMembresia", () => {
         const result = await userHasMembresia(USER_ID);
 
         expect(result).toBe(true);
+    });
+
+    it("retorna false si la membresía está cerrada por falta de tokens", async () => {
+        // Aunque estado=true y queden días de vigencia, una membresía sin tokens
+        // no cuenta como plan: el alumno debe poder comprar el siguiente.
+        __setTableData("membresia", [{
+            id: "m1",
+            usuario_id: USER_ID,
+            estado: true,
+            congelada: false,
+            sin_tokens: true,
+            fecha_inicio: "2026-06-01T00:00:00.000Z",
+            fecha_vencimiento: "2026-07-01T00:00:00.000Z",
+        }]);
+
+        const result = await userHasMembresia(USER_ID);
+
+        expect(result).toBe(false);
     });
 
     it("retorna false si la membresía está VENCIDA aunque estado=true", async () => {

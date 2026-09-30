@@ -91,16 +91,42 @@ export async function POST(request: Request) {
     }
   }
 
-  const { data: existingMembresia } = await adminClient
+  // Filtro en la base (no en JS) para no dejar pasar duplicados: un admin puede
+  // crear membresías manualmente desde el panel de gestión sin cerrar la anterior.
+  const { data: existingMembresia, error: membresiaError } = await adminClient
     .from("membresia")
-    .select("id, fecha_inicio, fecha_vencimiento")
+    .select("id, fecha_inicio, fecha_vencimiento, estado, congelada, sin_tokens")
     .eq("usuario_id", user.id)
+    .eq("estado", true)
+    .eq("congelada", false)
+    .eq("sin_tokens", false)
     .order("fecha_inicio", { ascending: false })
     .limit(1)
     .maybeSingle();
 
+  // Falla cerrado: si la consulta falla (por ejemplo, porque la migración
+  // sin_tokens todavía no se aplicó) NO se permite comprar, porque responder
+  // "no tenés membresía" sería un bypass silencioso del control.
+  if (membresiaError) {
+    return NextResponse.json(
+      { error: "No pudimos verificar tu plan actual. Intenta de nuevo en un momento." },
+      { status: 500 }
+    );
+  }
+
   if (existingMembresia) {
-    if (membresiaActiva(existingMembresia.fecha_vencimiento)) {
+    const m = existingMembresia as {
+      fecha_inicio: string;
+      fecha_vencimiento: string;
+    };
+
+    // Solo bloquea la compra si la membresía vigente es realmente USABLE.
+    // Una membresía sin tokens (sin_tokens=true, cerrada por el trigger al
+    // agotar el saldo) deja de bloquear la compra: ese es el objetivo de la
+    // regla. Los días que quedaban se pierden.
+    const vigente = membresiaActiva(m.fecha_vencimiento) && m.fecha_inicio <= new Date().toISOString();
+
+    if (vigente) {
       return NextResponse.json(
         { error: "Ya tienes un plan activo. No puedes comprar otro hasta que termine el período actual." },
         { status: 409 }
